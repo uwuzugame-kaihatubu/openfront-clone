@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenFront Clone — 領土制圧ゲーム</title>
+<style>
+:root {
+  --bg:      #0d1117;
+  --surface: #161b22;
+  --border:  #30363d;
+  --text:    #e6edf3;
+  --muted:   #8b949e;
+  --accent:  #e05c3a;
+  --ally:    #3fb950;
+  --info:    #58a6ff;
+  --warn:    #d29922;
+  --danger:  #f85149;
+  --radius:  8px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Courier New',monospace;overflow:hidden;height:100vh;display:flex;flex-direction:column;}
+input,select,button{font-family:inherit;font-size:13px;}
+
+/* ── LOBBY ──────────────────────────────────────────────────────────────── */
+#lobby{display:flex;align-items:center;justify-content:center;height:100vh;background:var(--bg);}
+.lobby-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px;width:480px;max-width:95vw;}
+.lobby-card h1{font-size:22px;letter-spacing:2px;color:var(--text);margin-bottom:4px;}
+.lobby-card .sub{font-size:11px;color:var(--muted);margin-bottom:24px;}
+.tabs{display:flex;gap:0;margin-bottom:20px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+.tab-btn{flex:1;padding:8px;background:transparent;border:none;color:var(--muted);cursor:pointer;font-family:inherit;font-size:12px;transition:all .15s;}
+.tab-btn.active{background:var(--accent);color:#fff;}
+.tab-pane{display:none;} .tab-pane.active{display:block;}
+.form-row{display:flex;flex-direction:column;gap:5px;margin-bottom:14px;}
+.form-row label{font-size:11px;color:var(--muted);}
+.form-row input,.form-row select{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:8px 10px;width:100%;}
+.form-row input:focus,.form-row select:focus{outline:none;border-color:var(--accent);}
+.form-row.inline{flex-direction:row;align-items:center;gap:8px;}
+.form-row.inline label{white-space:nowrap;min-width:100px;}
+.form-row.inline input[type=range]{flex:1;}
+.form-row.inline .rval{min-width:36px;text-align:right;color:var(--text);}
+.color-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+.color-row label{font-size:11px;color:var(--muted);min-width:80px;}
+.color-row input[type=color]{width:44px;height:30px;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer;}
+.primary-btn{width:100%;padding:11px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);cursor:pointer;font-size:14px;font-family:inherit;letter-spacing:1px;transition:opacity .15s;margin-top:4px;}
+.primary-btn:hover{opacity:.85;}
+.primary-btn:disabled{opacity:.45;cursor:default;}
+.room-code{font-size:28px;letter-spacing:6px;text-align:center;color:var(--info);font-weight:bold;margin:12px 0;}
+.lobby-players{margin:12px 0;display:flex;flex-direction:column;gap:6px;}
+.lp-row{display:flex;align-items:center;gap:8px;font-size:13px;}
+.lp-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.lp-badge{font-size:10px;color:var(--muted);border:1px solid var(--border);border-radius:3px;padding:1px 5px;}
+#lobby-status{font-size:12px;color:var(--warn);margin-top:8px;min-height:18px;text-align:center;}
+.info-box{background:rgba(88,166,255,.08);border:1px solid rgba(88,166,255,.25);border-radius:var(--radius);padding:10px 12px;font-size:11px;color:var(--info);line-height:1.7;margin-bottom:16px;}
+
+/* ── GAME ───────────────────────────────────────────────────────────────── */
+#game{display:none;flex-direction:column;height:100vh;}
+#top-bar{display:flex;gap:8px;padding:6px 8px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;align-items:flex-start;}
+#player-card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;min-width:180px;}
+#player-card h3{font-size:10px;color:var(--muted);margin-bottom:5px;}
+.pstats{display:flex;gap:14px;}
+.pstat{display:flex;flex-direction:column;align-items:center;}
+.pstat-v{font-size:16px;font-weight:bold;}
+.pstat-l{font-size:9px;color:var(--muted);}
+.popbar{height:4px;background:var(--border);border-radius:2px;margin-top:5px;overflow:hidden;}
+.popfill{height:100%;border-radius:2px;background:var(--ally);transition:width .4s;}
+
+#lb-card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;min-width:170px;}
+#lb-card h3{font-size:10px;color:var(--muted);margin-bottom:5px;}
+.lb-row{display:flex;justify-content:space-between;font-size:11px;margin:2px 0;align-items:center;}
+.lb-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px;flex-shrink:0;}
+
+#map-wrap{flex:1;position:relative;overflow:hidden;}
+canvas#map{display:block;width:100%;height:100%;image-rendering:pixelated;cursor:crosshair;}
+
+/* Target panel */
+#target-panel{position:absolute;right:8px;top:8px;background:rgba(13,17,23,.9);border:1px solid var(--border);border-radius:var(--radius);padding:10px 13px;min-width:170px;pointer-events:all;}
+#target-panel h3{font-size:10px;color:var(--muted);margin-bottom:6px;}
+#tgt-name{font-size:14px;font-weight:bold;margin-bottom:2px;}
+#tgt-info{font-size:11px;color:var(--muted);}
+
+/* Bottom bar */
+#bottom-bar{display:flex;gap:8px;padding:6px 8px;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;align-items:flex-end;}
+#ctrl-panel{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;flex:1;}
+#ctrl-panel h3{font-size:10px;color:var(--muted);margin-bottom:7px;}
+.ctrl-row{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:11px;color:var(--muted);}
+.ctrl-row label{width:96px;}
+.ctrl-row input[type=range]{flex:1;height:3px;}
+.ctrl-row .cv{width:36px;text-align:right;color:var(--text);font-size:11px;}
+
+#action-col{display:flex;flex-direction:column;gap:5px;}
+.abtn{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:7px 14px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit;transition:all .15s;white-space:nowrap;}
+.abtn:hover:not(:disabled){background:rgba(255,255,255,.07);}
+.abtn:disabled{opacity:.35;cursor:default;}
+.abtn.atk{border-color:var(--accent);color:var(--accent);}
+.abtn.atk:hover:not(:disabled){background:rgba(224,92,58,.15);}
+.abtn.aly{border-color:var(--ally);color:var(--ally);}
+.abtn.aly:hover:not(:disabled){background:rgba(63,185,80,.12);}
+.abtn.nuke{border-color:var(--warn);color:var(--warn);}
+.abtn.nuke:hover:not(:disabled){background:rgba(210,153,34,.12);}
+
+/* Chat */
+#chat-panel{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:8px;width:200px;display:flex;flex-direction:column;gap:5px;}
+#chat-msgs{font-size:11px;height:60px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
+.chat-msg{line-height:1.3;}
+.chat-name{font-weight:bold;}
+#chat-input{display:flex;gap:4px;}
+#chat-input input{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:4px 6px;font-size:11px;}
+#chat-input button{background:var(--accent);border:none;border-radius:4px;color:#fff;cursor:pointer;padding:4px 8px;font-size:11px;font-family:inherit;}
+
+/* Notifications */
+#notif{position:absolute;top:50px;left:50%;transform:translateX(-50%);padding:7px 18px;border-radius:20px;font-size:13px;pointer-events:none;opacity:0;transition:opacity .3s;background:rgba(30,30,40,.95);border:1px solid var(--border);white-space:nowrap;z-index:100;}
+#notif.show{opacity:1;}
+
+/* Victory overlay */
+#victory{position:absolute;inset:0;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;z-index:200;pointer-events:all;}
+#victory h1{font-size:36px;letter-spacing:3px;}
+#victory p{font-size:14px;color:var(--muted);}
+#victory button{background:var(--accent);color:#fff;border:none;border-radius:var(--radius);padding:12px 28px;font-size:14px;cursor:pointer;font-family:inherit;letter-spacing:1px;}
+
+/* Nuke flash */
+#nuke-flash{position:absolute;inset:0;background:rgba(255,255,100,.5);pointer-events:none;opacity:0;transition:opacity .1s;z-index:50;}
+
+/* minimap */
+#minimap-wrap{position:absolute;right:8px;bottom:8px;background:rgba(13,17,23,.8);border:1px solid var(--border);border-radius:4px;padding:2px;pointer-events:none;}
+canvas#minimap{display:block;image-rendering:pixelated;}
+</style>
+</head>
+<body>
+
+<!-- ── LOBBY ─────────────────────────────────────────────────────────────── -->
+<div id="lobby">
+<div class="lobby-card">
+  <h1>⚔ OPENFRONT CLONE</h1>
+  <p class="sub">Based on OpenFront (openfrontio/OpenFrontIO) • AGPL-3.0</p>
+  <div class="info-box">友達を招待してルームコードを共有するだけ！<br>最大8人 + Botで即プレイ。完全無料。</div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('create')">🏠 作成</button>
+    <button class="tab-btn" onclick="showTab('join')">🔗 参加</button>
+  </div>
+
+  <!-- Create tab -->
+  <div class="tab-pane active" id="tab-create">
+    <div class="form-row">
+      <label>プレイヤー名</label>
+      <input type="text" id="c-name" maxlength="20" placeholder="あなたの名前" value="Player">
+    </div>
+    <div class="color-row">
+      <label>国の色</label>
+      <input type="color" id="c-color" value="#e05c3a">
+    </div>
+    <hr style="border-color:var(--border);margin:12px 0;">
+    <div class="form-row inline">
+      <label>Bot数</label>
+      <input type="range" id="c-bots" min="1" max="13" value="6" oninput="document.getElementById('c-bots-v').textContent=this.value">
+      <span class="rval" id="c-bots-v">6</span>
+    </div>
+    <div class="form-row">
+      <label>Bot難易度</label>
+      <select id="c-diff"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select>
+    </div>
+    <div class="form-row inline">
+      <label>勝利条件</label>
+      <input type="range" id="c-vpct" min="50" max="90" step="5" value="80" oninput="document.getElementById('c-vpct-v').textContent=this.value+'%'">
+      <span class="rval" id="c-vpct-v">80%</span>
+    </div>
+    <div class="form-row inline">
+      <label>核コスト(G)</label>
+      <input type="range" id="c-nuke" min="500" max="5000" step="250" value="2500" oninput="document.getElementById('c-nuke-v').textContent=this.value">
+      <span class="rval" id="c-nuke-v">2500</span>
+    </div>
+    <button class="primary-btn" id="create-btn" onclick="createRoom()">▶ ルーム作成</button>
+  </div>
+
+  <!-- Join tab -->
+  <div class="tab-pane" id="tab-join">
+    <div class="form-row">
+      <label>プレイヤー名</label>
+      <input type="text" id="j-name" maxlength="20" placeholder="あなたの名前" value="Player">
+    </div>
+    <div class="color-row">
+      <label>国の色</label>
+      <input type="color" id="j-color" value="#4a9eff">
+    </div>
+    <div class="form-row">
+      <label>ルームコード（5文字）</label>
+      <input type="text" id="j-code" maxlength="5" placeholder="XXXXX" style="text-transform:uppercase;letter-spacing:4px;font-size:18px;text-align:center;">
+    </div>
+    <button class="primary-btn" id="join-btn" onclick="joinRoom()">🔗 参加する</button>
+  </div>
+
+  <!-- Waiting room (after create/join) -->
+  <div id="waiting-room" style="display:none;margin-top:20px;">
+    <div style="text-align:center;margin-bottom:10px;font-size:11px;color:var(--muted);">ルームコードを友達に共有：</div>
+    <div class="room-code" id="room-code-display">—</div>
+    <div class="lobby-players" id="lobby-player-list"></div>
+    <button class="primary-btn" id="start-btn" style="display:none;margin-top:10px;" onclick="sendStartGame()">▶ ゲーム開始</button>
+    <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;" id="waiting-hint">ホストがゲームを開始するまで待機中...</div>
+  </div>
+
+  <div id="lobby-status"></div>
+</div>
+</div>
+
+<!-- ── GAME ───────────────────────────────────────────────────────────────── -->
+<div id="game">
+  <div id="top-bar">
+    <div id="player-card">
+      <h3 id="my-nation-label">🏴 YOUR NATION</h3>
+      <div class="pstats">
+        <div class="pstat"><span class="pstat-v" id="stat-troops">0</span><span class="pstat-lbl pstat-l">兵力</span></div>
+        <div class="pstat"><span class="pstat-v" id="stat-land">0%</span><span class="pstat-lbl pstat-l">領土</span></div>
+        <div class="pstat"><span class="pstat-v" id="stat-gold">0</span><span class="pstat-lbl pstat-l">ゴールド</span></div>
+        <div class="pstat"><span class="pstat-v" id="stat-nukes">0</span><span class="pstat-lbl pstat-l">☢ 核</span></div>
+      </div>
+      <div class="popbar"><div class="popfill" id="pop-fill" style="width:0%"></div></div>
+    </div>
+
+    <div id="lb-card">
+      <h3>🏆 LEADERBOARD</h3>
+      <div id="lb-content"></div>
+    </div>
+  </div>
+
+  <div id="map-wrap">
+    <canvas id="map"></canvas>
+    <div id="nuke-flash"></div>
+
+    <div id="target-panel">
+      <h3>🎯 TARGET</h3>
+      <div id="tgt-name">— なし —</div>
+      <div id="tgt-info"></div>
+    </div>
+
+    <div id="notif"></div>
+
+    <div id="minimap-wrap">
+      <canvas id="minimap" width="120" height="82"></canvas>
+    </div>
+
+    <div id="victory">
+      <h1 id="v-title">🏆 VICTORY!</h1>
+      <p id="v-msg">You conquered the map!</p>
+      <button onclick="location.reload()">▶ もう一度プレイ</button>
+    </div>
+  </div>
+
+  <div id="bottom-bar">
+    <div id="ctrl-panel">
+      <h3>⚔ コマンドセンター</h3>
+      <div class="ctrl-row">
+        <label>⚔ 攻撃比率</label>
+        <input type="range" id="ar" min="5" max="100" value="50" step="5" oninput="document.getElementById('ar-v').textContent=this.value+'%'">
+        <span class="cv" id="ar-v">50%</span>
+      </div>
+      <div class="ctrl-row">
+        <label>👷 生産比率</label>
+        <input type="range" id="wr" min="0" max="100" value="50" step="5" oninput="document.getElementById('wr-v').textContent=this.value+'%'">
+        <span class="cv" id="wr-v">50%</span>
+      </div>
+    </div>
+
+    <div id="action-col">
+      <button class="abtn atk" id="atk-btn" onclick="doAttack()" disabled>⚔ ATTACK</button>
+      <button class="abtn aly" id="aly-btn" onclick="doAlliance()" disabled>🤝 ALLY</button>
+      <button class="abtn nuke" id="nuke-btn" onclick="doNuke()" disabled>☢ NUKE (0)</button>
+    </div>
+
+    <div id="chat-panel">
+      <div id="chat-msgs"></div>
+      <div id="chat-input">
+        <input id="chat-box" type="text" maxlength="80" placeholder="チャット..." onkeydown="if(event.key==='Enter')sendChat()">
+        <button onclick="sendChat()">▸</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Config ──────────────────────────────────────────────────────────────────
+const WS_URL = location.protocol==='https:' ? 'wss://'+location.host : 'ws://'+location.host;
+const MAP_W=80, MAP_H=55;
+const T_DEF=[1.0,1.4,2.0,0];
+const T_COLOR=['#2d5016','#5a7040','#6b7280','#1a3a5c'];
+
+// ── State ───────────────────────────────────────────────────────────────────
+let ws, myPid, myRoomId, isHost=false;
+let mapData=null; // {terrain[], owner[], troops[], nuked[]}
+let players=[];
+let selectedCell=null;
+let viewX=0, viewY=0, zoom=1;
+let dragging=false, dragStart=null, dragViewStart=null;
+let isPlaying=false;
+
+// Canvas
+const mapCanvas  = document.getElementById('map');
+const mapCtx     = mapCanvas.getContext('2d');
+const miniCanvas = document.getElementById('minimap');
+const miniCtx    = miniCanvas.getContext('2d');
+let offCanvas, offCtx; // offscreen for map
+
+// ── Lobby logic ─────────────────────────────────────────────────────────────
+function showTab(t) {
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['create','join'][i]===t));
+  document.querySelectorAll('.tab-pane').forEach((p,i)=>p.classList.toggle('active',['tab-create','tab-join'][i]==='tab-'+t));
+}
+
+function connectWS(cb) {
+  if(ws && ws.readyState<=1) { cb && cb(); return; }
+  ws = new WebSocket(WS_URL);
+  ws.onopen = cb;
+  ws.onmessage = e => handleMessage(JSON.parse(e.data));
+  ws.onerror = () => setLobbyStatus('❌ 接続エラー。ページを更新してください。');
+  ws.onclose = () => { if(isPlaying) notify('⚠ 接続が切断されました','#f85149'); };
+}
+
+function createRoom() {
+  const name=document.getElementById('c-name').value.trim()||'Player';
+  const color=document.getElementById('c-color').value;
+  document.getElementById('create-btn').disabled=true;
+  connectWS(()=>{
+    ws.send(JSON.stringify({
+      type:'create_room', name, color,
+      botCount:+document.getElementById('c-bots').value,
+      difficulty:document.getElementById('c-diff').value,
+      victoryPct:+document.getElementById('c-vpct').value,
+      nukeGoldCost:+document.getElementById('c-nuke').value
+    }));
+  });
+}
+function joinRoom() {
+  const name=document.getElementById('j-name').value.trim()||'Player';
+  const color=document.getElementById('j-color').value;
+  const code=document.getElementById('j-code').value.trim().toUpperCase();
+  if(code.length!==5){setLobbyStatus('⚠ ルームコードは5文字です');return;}
+  document.getElementById('join-btn').disabled=true;
+  connectWS(()=>ws.send(JSON.stringify({type:'join_room',name,color,roomId:code})));
+}
+function sendStartGame() { ws.send(JSON.stringify({type:'start_game'})); }
+function setLobbyStatus(msg) { document.getElementById('lobby-status').textContent=msg; }
+
+function showWaitingRoom(roomId, pid, lobby) {
+  myRoomId=roomId; myPid=pid;
+  isHost=lobby.players.find(p=>p.id===pid)?.isHost||false;
+  document.getElementById('room-code-display').textContent=roomId;
+  document.getElementById('waiting-room').style.display='block';
+  document.querySelector('.tabs').style.display='none';
+  document.querySelectorAll('.tab-pane').forEach(p=>p.style.display='none');
+  document.getElementById('create-btn').style.display='none';
+  document.getElementById('join-btn').style.display='none';
+  if(isHost) {
+    document.getElementById('start-btn').style.display='block';
+    document.getElementById('waiting-hint').textContent='参加者が揃ったら「ゲーム開始」を押してください';
+  }
+  updateLobbyPlayers(lobby);
+}
+
+function updateLobbyPlayers(lobby) {
+  const list=document.getElementById('lobby-player-list');
+  list.innerHTML=lobby.players.map(p=>`
+    <div class="lp-row">
+      <span class="lp-dot" style="background:${p.color}"></span>
+      <span>${p.name}</span>
+      ${p.isHost?'<span class="lp-badge">HOST</span>':''}
+    </div>`).join('');
+}
+
+// ── Game start ───────────────────────────────────────────────────────────────
+function startGame(data) {
+  isPlaying=true;
+  document.getElementById('lobby').style.display='none';
+  document.getElementById('game').style.display='flex';
+  mapData=data.map;
+  players=data.players;
+  resizeCanvas();
+  buildOffscreen();
+  renderFull();
+  renderMinimap();
+  updateHUD();
+  notify('🎮 ゲーム開始！','#3fb950');
+}
+
+function resizeCanvas() {
+  const wrap=document.getElementById('map-wrap');
+  mapCanvas.width=wrap.clientWidth;
+  mapCanvas.height=wrap.clientHeight;
+}
+window.addEventListener('resize',()=>{if(isPlaying){resizeCanvas();renderFull();}});
+
+// ── Offscreen map ────────────────────────────────────────────────────────────
+function buildOffscreen() {
+  offCanvas=document.createElement('canvas');
+  offCanvas.width=MAP_W; offCanvas.height=MAP_H;
+  offCtx=offCanvas.getContext('2d');
+}
+
+function blendHex(a,b,t) {
+  const pr=n=>parseInt(n,16);
+  const ar=pr(a.slice(1,3)),ag=pr(a.slice(3,5)),ab=pr(a.slice(5,7));
+  const br=pr(b.slice(1,3)),bg=pr(b.slice(3,5)),bb=pr(b.slice(5,7));
+  const rr=Math.round(ar+(br-ar)*t),rg=Math.round(ag+(bg-ag)*t),rb=Math.round(ab+(bb-ab)*t);
+  return `rgb(${rr},${rg},${rb})`;
+}
+
+function renderFull() {
+  if(!mapData||!offCtx) return;
+  const {terrain,owner,troops,nuked}=mapData;
+  const img=offCtx.createImageData(MAP_W,MAP_H);
+  const d=img.data;
+  for(let i=0;i<MAP_W*MAP_H;i++) {
+    const t=terrain[i], o=owner[i], tr=troops[i], n=nuked[i];
+    let r,g,b;
+    const tc=T_COLOR[t];
+    const tr2=parseInt(tc.slice(1,3),16), tg2=parseInt(tc.slice(3,5),16), tb2=parseInt(tc.slice(5,7),16);
+    if(n) { r=60;g=35;b=5; }
+    else if(o>=0&&players[o]&&players[o].alive) {
+      const pc=players[o].color;
+      const pr=parseInt(pc.slice(1,3),16), pg=parseInt(pc.slice(3,5),16), pb=parseInt(pc.slice(5,7),16);
+      const mix=Math.min(1,0.55+(tr/300)*0.35);
+      r=Math.round(tr2+(pr-tr2)*mix);
+      g=Math.round(tg2+(pg-tg2)*mix);
+      b=Math.round(tb2+(pb-tb2)*mix);
+    } else { r=tr2;g=tg2;b=tb2; }
+    const idx=i*4;
+    d[idx]=r; d[idx+1]=g; d[idx+2]=b; d[idx+3]=255;
+  }
+  offCtx.putImageData(img,0,0);
+  drawToScreen();
+}
+
+function drawToScreen() {
+  if(!offCanvas||!mapCanvas) return;
+  const W=mapCanvas.width, H=mapCanvas.height;
+  mapCtx.clearRect(0,0,W,H);
+  const tileW=W/MAP_W*zoom, tileH=H/MAP_H*zoom;
+  mapCtx.imageSmoothingEnabled=false;
+  mapCtx.drawImage(offCanvas, viewX, viewY, MAP_W/zoom, MAP_H/zoom, 0, 0, W, H);
+
+  // Draw borders
+  mapCtx.strokeStyle='rgba(0,0,0,0.35)';
+  mapCtx.lineWidth=0.5;
+  const {owner}=mapData;
+  const scaleX=W/MAP_W*zoom, scaleY=H/MAP_H*zoom;
+  const startX=Math.floor(viewX), startY=Math.floor(viewY);
+  const endX=Math.min(MAP_W,Math.ceil(viewX+MAP_W/zoom));
+  const endY=Math.min(MAP_H,Math.ceil(viewY+MAP_H/zoom));
+
+  for(let y=startY;y<endY;y++) for(let x=startX;x<endX;x++) {
+    const i=y*MAP_W+x;
+    if(owner[i]<0) continue;
+    const px=(x-viewX)*scaleX, py=(y-viewY)*scaleY;
+    if(x+1<MAP_W&&owner[i]!==owner[i+1]&&(owner[i]>=0||owner[i+1]>=0)) {
+      mapCtx.beginPath(); mapCtx.moveTo(px+scaleX,py); mapCtx.lineTo(px+scaleX,py+scaleY); mapCtx.stroke();
+    }
+    if(y+1<MAP_H&&owner[i]!==owner[(y+1)*MAP_W+x]&&(owner[i]>=0||owner[(y+1)*MAP_W+x]>=0)) {
+      mapCtx.beginPath(); mapCtx.moveTo(px,py+scaleY); mapCtx.lineTo(px+scaleX,py+scaleY); mapCtx.stroke();
+    }
+  }
+
+  // Selection highlight
+  if(selectedCell!==null) {
+    const sx=selectedCell%MAP_W, sy=Math.floor(selectedCell/MAP_W);
+    const px=(sx-viewX)*scaleX, py=(sy-viewY)*scaleY;
+    mapCtx.strokeStyle='rgba(255,255,255,0.9)';
+    mapCtx.lineWidth=2;
+    mapCtx.strokeRect(px+1,py+1,scaleX-2,scaleY-2);
+  }
+}
+
+function renderMinimap() {
+  if(!mapData||!miniCtx) return;
+  const {terrain,owner,nuked}=mapData;
+  const img=miniCtx.createImageData(MAP_W,MAP_H);
+  const d=img.data;
+  for(let i=0;i<MAP_W*MAP_H;i++) {
+    const t=terrain[i],o=owner[i],n=nuked[i];
+    let r,g,b;
+    if(n){r=60;g=35;b=5;}
+    else if(o>=0&&players[o]&&players[o].alive){
+      const pc=players[o].color;
+      r=parseInt(pc.slice(1,3),16); g=parseInt(pc.slice(3,5),16); b=parseInt(pc.slice(5,7),16);
+    } else {const tc=T_COLOR[t]; r=parseInt(tc.slice(1,3),16);g=parseInt(tc.slice(3,5),16);b=parseInt(tc.slice(5,7),16);}
+    const idx=i*4; d[idx]=r;d[idx+1]=g;d[idx+2]=b;d[idx+3]=255;
+  }
+  miniCtx.putImageData(img,0,0);
+
+  // Viewport rect on minimap
+  const mw=miniCanvas.width, mh=miniCanvas.height;
+  const vx=viewX/MAP_W*mw, vy=viewY/MAP_H*mh;
+  const vw=mw/zoom, vh=mh/zoom;
+  miniCtx.strokeStyle='rgba(255,255,255,0.7)';
+  miniCtx.lineWidth=1;
+  miniCtx.strokeRect(vx,vy,vw,vh);
+}
+
+// ── Pan & Zoom ───────────────────────────────────────────────────────────────
+mapCanvas.addEventListener('mousedown', e=>{
+  if(e.button===1||e.button===2){dragging=true;dragStart={x:e.clientX,y:e.clientY};dragViewStart={x:viewX,y:viewY};e.preventDefault();}
+});
+mapCanvas.addEventListener('mousemove', e=>{
+  if(dragging){
+    const dx=(e.clientX-dragStart.x)/mapCanvas.width*MAP_W/zoom;
+    const dy=(e.clientY-dragStart.y)/mapCanvas.height*MAP_H/zoom;
+    viewX=clamp(dragViewStart.x-dx,0,MAP_W-MAP_W/zoom);
+    viewY=clamp(dragViewStart.y-dy,0,MAP_H-MAP_H/zoom);
+    drawToScreen(); renderMinimap();
+  }
+});
+mapCanvas.addEventListener('mouseup', e=>{if(e.button===1||e.button===2)dragging=false;});
+mapCanvas.addEventListener('contextmenu',e=>e.preventDefault());
+mapCanvas.addEventListener('wheel', e=>{
+  e.preventDefault();
+  const factor=e.deltaY<0?1.15:0.87;
+  const nx=clamp(zoom*factor,1,8);
+  viewX=clamp(viewX,0,MAP_W-MAP_W/nx);
+  viewY=clamp(viewY,0,MAP_H-MAP_H/nx);
+  zoom=nx;
+  drawToScreen(); renderMinimap();
+});
+
+mapCanvas.addEventListener('click', e=>{
+  if(dragging) return;
+  const rect=mapCanvas.getBoundingClientRect();
+  const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+  const gx=Math.floor(viewX+mx/mapCanvas.width*(MAP_W/zoom));
+  const gy=Math.floor(viewY+my/mapCanvas.height*(MAP_H/zoom));
+  if(gx<0||gx>=MAP_W||gy<0||gy>=MAP_H) return;
+  const ci=gy*MAP_W+gx;
+  if(mapData.terrain[ci]===3){selectedCell=null;} else {selectedCell=ci;}
+  drawToScreen(); updateHUD();
+});
+
+// ── HUD ──────────────────────────────────────────────────────────────────────
+function updateHUD() {
+  const me=players[myPid];
+  if(!me) return;
+  const totalLand=mapData.terrain.filter(t=>t!==3).length;
+  const myCells=countCells(myPid);
+  const pct=totalLand>0?Math.round(myCells/totalLand*100):0;
+
+  document.getElementById('stat-troops').textContent=Math.floor(me.troops);
+  document.getElementById('stat-land').textContent=pct+'%';
+  document.getElementById('stat-gold').textContent=Math.floor(me.gold);
+  document.getElementById('stat-nukes').textContent=me.nukes;
+  document.getElementById('pop-fill').style.width=Math.min(100,pct*1.3)+'%';
+  document.getElementById('my-nation-label').innerHTML=`<span style="color:${me.color}">■</span> ${me.name}`;
+
+  // Leaderboard
+  const sorted=[...players].filter(p=>p.alive).sort((a,b)=>countCells(b.id)-countCells(a.id));
+  document.getElementById('lb-content').innerHTML=sorted.slice(0,7).map(p=>{
+    const c=countCells(p.id); const pct2=totalLand>0?Math.round(c/totalLand*100):0;
+    return `<div class="lb-row"><span><span class="lb-dot" style="background:${p.color}"></span>${p.name}</span><span>${pct2}%</span></div>`;
+  }).join('');
+
+  // Target panel
+  const hasTarget=selectedCell!==null;
+  const targetOwner=hasTarget?mapData.owner[selectedCell]:-1;
+  const me2=players[myPid];
+  const attackable=hasTarget&&targetOwner!==myPid&&mapData.terrain[selectedCell]!==3;
+  document.getElementById('atk-btn').disabled=!attackable;
+  document.getElementById('aly-btn').disabled=!attackable||targetOwner<0;
+  document.getElementById('nuke-btn').disabled=!hasTarget||(me2.nukes||0)<=0;
+  document.getElementById('nuke-btn').textContent=`☢ NUKE (${me2.nukes||0})`;
+
+  if(hasTarget) {
+    const tp=players[targetOwner];
+    const allyMark=me2.alliances&&me2.alliances.includes&&me2.alliances.includes(targetOwner)?' 🤝':'';
+    document.getElementById('tgt-name').textContent=tp?tp.name+allyMark:'中立地帯';
+    document.getElementById('tgt-name').style.color=tp?tp.color:'var(--muted)';
+    document.getElementById('tgt-info').textContent=`兵力: ${Math.floor(mapData.troops[selectedCell])} | 防御: ×${T_DEF[mapData.terrain[selectedCell]]}`;
+  } else {
+    document.getElementById('tgt-name').textContent='— なし —';
+    document.getElementById('tgt-name').style.color='var(--muted)';
+    document.getElementById('tgt-info').textContent='';
+  }
+}
+
+function countCells(pid) {
+  if(!mapData) return 0;
+  let c=0; for(let o of mapData.owner) if(o===pid) c++; return c;
+}
+
+// ── Actions ──────────────────────────────────────────────────────────────────
+function doAttack() {
+  if(selectedCell===null||!ws) return;
+  const targetOwner=mapData.owner[selectedCell];
+  // Find best adjacent owned cell
+  const tx=selectedCell%MAP_W, ty=Math.floor(selectedCell/MAP_W);
+  let bestFrom=-1, bestTroops=0;
+  for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++) {
+    if(dx===0&&dy===0) continue;
+    const nx=tx+dx,ny=ty+dy;
+    if(nx<0||nx>=MAP_W||ny<0||ny>=MAP_H) continue;
+    const ni=ny*MAP_W+nx;
+    if(mapData.owner[ni]===myPid&&mapData.troops[ni]>bestTroops){bestFrom=ni;bestTroops=mapData.troops[ni];}
+  }
+  if(bestFrom<0){notify('隣接領土から攻撃できません！','#f85149');return;}
+  const ratio=parseInt(document.getElementById('ar').value)/100;
+  ws.send(JSON.stringify({type:'attack',from:bestFrom,to:selectedCell,ratio}));
+}
+
+function doAlliance() {
+  if(selectedCell===null||!ws) return;
+  const targetOwner=mapData.owner[selectedCell];
+  if(targetOwner<0||targetOwner===myPid) return;
+  ws.send(JSON.stringify({type:'alliance',target:targetOwner}));
+}
+
+function doNuke() {
+  if(selectedCell===null||!ws) return;
+  ws.send(JSON.stringify({type:'nuke',cellIdx:selectedCell}));
+}
+
+function sendChat() {
+  const box=document.getElementById('chat-box');
+  const text=box.value.trim();
+  if(!text||!ws) return;
+  ws.send(JSON.stringify({type:'chat',text}));
+  box.value='';
+}
+
+// ── WebSocket messages ───────────────────────────────────────────────────────
+function handleMessage(msg) {
+  switch(msg.type) {
+    case 'room_created':
+      isHost=true;
+      showWaitingRoom(msg.roomId, msg.pid, msg.lobby);
+      break;
+    case 'room_joined':
+      showWaitingRoom(msg.roomId, msg.pid, msg.lobby);
+      break;
+    case 'lobby_update':
+      updateLobbyPlayers(msg.lobby);
+      break;
+    case 'game_start':
+      startGame(msg);
+      break;
+    case 'state':
+      applyState(msg);
+      break;
+    case 'nuke':
+      flashNuke();
+      notify('☢ 核攻撃発動！','#d29922');
+      break;
+    case 'game_over':
+      showVictory(msg);
+      break;
+    case 'chat':
+      addChat(msg);
+      break;
+    case 'notify':
+      notify(msg.msg, msg.color||'#58a6ff');
+      break;
+    case 'error':
+      setLobbyStatus('❌ '+msg.msg);
+      document.getElementById('create-btn').disabled=false;
+      document.getElementById('join-btn').disabled=false;
+      break;
+  }
+}
+
+function applyState(msg) {
+  mapData.owner=msg.map.owner;
+  mapData.troops=msg.map.troops;
+  mapData.nuked=msg.map.nuked;
+  players=msg.players;
+  renderFull();
+  renderMinimap();
+  updateHUD();
+}
+
+function showVictory(msg) {
+  const isMe=msg.winner===myPid;
+  document.getElementById('v-title').textContent=isMe?'🏆 VICTORY! 勝利！':'💀 DEFEATED..';
+  document.getElementById('v-title').style.color=isMe?'#ffd700':'#f85149';
+  document.getElementById('v-msg').textContent=isMe?'マップを制覇しました！':`${msg.winnerName} が世界を征服した！`;
+  document.getElementById('victory').style.display='flex';
+}
+
+function addChat(msg) {
+  const msgs=document.getElementById('chat-msgs');
+  const div=document.createElement('div');
+  div.className='chat-msg';
+  div.innerHTML=`<span class="chat-name" style="color:${msg.color}">${escHtml(msg.name)}:</span> ${escHtml(msg.text)}`;
+  msgs.appendChild(div);
+  msgs.scrollTop=msgs.scrollHeight;
+  if(msgs.children.length>60) msgs.removeChild(msgs.firstChild);
+}
+
+function flashNuke() {
+  const f=document.getElementById('nuke-flash');
+  f.style.opacity='1';
+  setTimeout(()=>f.style.opacity='0',400);
+}
+
+function notify(msg,color='#58a6ff') {
+  const el=document.getElementById('notif');
+  el.textContent=msg; el.style.borderColor=color; el.style.color=color;
+  el.classList.add('show');
+  clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),2800);
+}
+
+// ── Utils ────────────────────────────────────────────────────────────────────
+function clamp(v,lo,hi){return Math.max(lo,Math.min(hi,v));}
+function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+</script>
+</body>
+</html>
